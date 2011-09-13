@@ -1,0 +1,187 @@
+<?php
+
+function islandora_harvester_menu() {
+  $items['islandora/harvest'] = array(
+    'title' => 'Harvest Items for Repository',
+    'description' => 'Retrieve items from OAI or CSV for ingestion',
+    'page callback' => 'ingest_page',
+    'access arguments' => TRUE,
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['oai/ahah'] = array(
+    'page callback' => 'update_oai_div',
+    'access arguments' => array('view fedora collection'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['oai/source/update'] = array(
+    'page callback' => 'update_source_div',
+    'access arguments' => array('view fedora collection'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['oai/destination/update'] = array(
+    'page callback' => 'update_destination_div',
+    'access arguments' => array('view fedora collection'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function ingest_page() {
+  $output = t('Ingest Metadata');
+
+  $output .= drupal_get_form('oai_ingest_form');
+  return $output;
+}
+
+function oai_ingest_form(&$form_state) {
+
+  module_load_include('inc', 'islandora_harvester', 'islandora_harvester');
+  $path = drupal_get_path('module', 'islandora_harvester');
+  drupal_add_js("$path/js/fix-jquery-update.js", 'theme');
+  $collections = get_collections_as_array();
+  $content_models = oai_get_content_models_as_array();
+
+  $input_type = $form_state['values']['input_type'];
+  $form['#attributes']['enctype'] = 'multipart/form-data';
+  $form['source_data'] = array(
+    '#prefix' => '<div id="source-info">',
+    '#suffix' => '</div>',
+    '#type' => 'fieldset',
+    '#title' => t('Source Data')
+  );
+
+  $form['source_data']['input_type'] = array(
+    '#type' => 'radios',
+    '#title' => t('Source type'),
+    '#options' => array('CSV' => 'CSV', 'OAI' => 'OAI-DC'),
+    '#default_value' => $input_type,
+    '#ahah' => array(
+      'path' => 'oai/source/update/source_data',
+      'wrapper' => 'source-info',
+      'effect' => 'fade',
+      'event' => 'change'),
+  );
+
+  if ($input_type == 'CSV' || $input_type == 'refworks') {
+    $form['source_data']['file_upload'] = array(
+      '#title' => 'Upload document',
+      '#type' => 'file',
+      '#description' => t("Upload $input_type source file for processing"),
+    );
+  }
+
+  if ($input_type == 'OAI') {
+    $form['source_data']['url'] = array(
+      '#type' => 'textfield',
+      '#title' => "Harvest from an external repository (OAI Set)",
+      '#maxlength' => 256,
+      "#description" => t('Enter full url to retrieve entire OAI resultset.'),
+    );
+  }
+
+  $create = $form_state['values']['create'];
+
+  $form['destination_data'] = array(
+    '#prefix' => '<div id="destination-info">',
+    '#suffix' => '</div>',
+    '#type' => 'fieldset',
+    '#title' => t('Destination')
+  );
+
+
+  $form['destination_data']['existing_collection'] = array(
+    '#title' => "Add to collection",
+    '#type' => 'select',
+    '#options' => $collections,
+    '#description' => t("Add objects to which collection?"),
+  );
+
+  $form['destination_data']['choiceLink'] = array(
+    '#type' => 'markup',
+    '#value' => l(t('Add new collection here'), 'admin/content/modeler'),
+  );
+  $form['destination_data']['content_model'] = array(
+    '#title' => "Choose content model",
+    '#type' => 'select',
+    '#options' => $content_models,
+    '#description' => t("Content models describe the behaviours of objects with which they are associated."),
+  );
+
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit')
+  );
+
+
+  return($form);
+}
+
+//STOP HERE - KNOWN WORKING COPY
+function oai_ingest_form_submit($form, &$form_state) {
+  module_load_include('inc', 'fedora_repository', 'api/fedora_item');
+  module_load_include('inc', 'islandora_harvester', 'islandora_harvester');
+  $collection_pid = $form_state['values']['existing_collection'];
+  $content_model = $form_state['values']['content_model'];
+  $collection_item = new fedora_item($collection_pid);
+  $collection_policy = $collection_item->get_datastream_dissemination('COLLECTION_POLICY');
+  $xml = simplexml_load_string($collection_policy);
+  $namespace = $xml->content_models->content_model['namespace'];
+  $namespace = substr($namespace, 0, strpos($namespace, ":"));
+
+  if (!empty($form_state['ahah_submission'])) {
+    return;
+  }
+
+  if ($form_state['values']['url']) {
+    $url = $form_state['values']['url'];
+    $urlParts = explode("?", $url);
+    $root_url = $urlParts[0];
+    $urls = get_tokens($url);
+    create_oai_batch($urls, $namespace, $collection_pid, $content_model);
+    return;
+  }
+
+  if ($_FILES['files']['name']['file_upload']) {
+    $csv_file = file_save_upload('file_upload');
+    if ($form_state['values']['input_type'] == 'CSV') {
+      create_csv_batch($csv_file, $namespace, $collection_pid);
+    }
+
+
+    //oai_ingest_from_file($form_state['values']['file']);
+  }
+}
+
+function oai_ingest_from_file($file) {
+  drupal_set_message("in file function - processing $file->filepath");
+}
+
+function update_source_div($data_source) {
+  $form = oai_callback_prep();
+  $changed_elements = $form[$data_source];
+  unset($changed_elements['#prefix'], $changed_elements['#suffix']);
+  $output = theme('status_messages') . drupal_render($changed_elements);
+  drupal_json(array(
+    'status' => TRUE,
+    'data' => $output,
+  ));
+}
+
+function oai_callback_prep() {
+  $form_state = array('storage' => NULL, 'submitted' => FALSE);
+  $form_build_id = $_POST['form_build_id'];
+  $form = form_get_cache($form_build_id, $form_state);
+  $args = $form['#parameters'];
+  $form_id = array_shift($args);
+  $form_state['post'] = $form['#post'] = $_POST;
+  // Enable the submit/validate handlers to determine whether AHAH-submittted.
+  $form_state['ahah_submission'] = TRUE;
+  $form['#programmed'] = $form['#redirect'] = FALSE;
+  drupal_process_form($form_id, $form, $form_state);
+  $form = drupal_rebuild_form($form_id, $form_state, $args, $form_build_id);
+  return $form;
+}
+
