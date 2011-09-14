@@ -5,7 +5,7 @@ function islandora_harvester_menu() {
     'title' => 'Harvest Items for Repository',
     'description' => 'Retrieve items from OAI or CSV for ingestion',
     'page callback' => 'ingest_page',
-    'access arguments' => TRUE,
+    'access arguments' => array('view fedora collection'),
     'type' => MENU_NORMAL_ITEM,
   );
 
