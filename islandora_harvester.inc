@@ -77,6 +77,7 @@ function oai_get_content_models_as_array() {
  * @return array
  */
 function oai_get_data($url) {
+  set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $data = do_curl($url);
   $dom = new DOMDocument();
@@ -108,6 +109,7 @@ function oai_get_data($url) {
  * @param string $collection_pid
  */
 function build_oai_objects($record, $namespace, $collection_pid, $content_model) {
+  set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   module_load_include('inc', 'fedora_repository', 'api/fedora_item');
   $pid = fedora_item::get_next_PID_in_namespace($namespace);
@@ -133,6 +135,7 @@ function build_oai_objects($record, $namespace, $collection_pid, $content_model)
  * @param string $collection_pid
  */
 function build_csv_objects($headers, $data, $namespace, $collection_pid, $content_model) {
+  set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_item');
   module_load_include('inc', 'fedora_repository', 'api/dublin_core');
   $dc = new Dublin_Core();
@@ -190,6 +193,7 @@ function create_oai_batch($urls, $namespace, $collection_pid, $content_model) {
  * @param string $collection_pid
  */
 function create_csv_batch($file, $namespace, $collection_pid) {
+  set_time_limit(0);
 
 
   $csv = $file->filepath;
@@ -228,6 +232,7 @@ function create_csv_batch($file, $namespace, $collection_pid) {
  * @param string $collection_pid
  */
 function process_input($url, $namespace, $collection_pid, $content_model) {
+  set_time_limit(0);
   $records = oai_get_data($url);
   foreach ($records as $record) {
     build_oai_objects($record, $namespace, $collection_pid, $content_model);
@@ -242,6 +247,7 @@ function process_input($url, $namespace, $collection_pid, $content_model) {
  * @return string
  */
 function get_tokens($url) {
+  set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $urlParts = explode('?', $url);
   $base_url = $urlParts[0] . "?verb=ListRecords&resumptionToken=";
