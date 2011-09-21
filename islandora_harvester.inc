@@ -58,10 +58,9 @@ function oai_get_content_models_as_array() {
     if ($item) {
       $parts = explode(',', $item);
       $item = new fedora_item($parts[0]);
-      if ($item->get_datastream_dissemination('ISLANDORACM')){
+      if ($item->get_datastream_dissemination('ISLANDORACM')) {
         $options[$parts[0]] = $parts[1];
       }
-      
     }
   }
 
@@ -251,7 +250,23 @@ function get_tokens($url) {
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $urlParts = explode('?', $url);
   $base_url = $urlParts[0] . "?verb=ListRecords&resumptionToken=";
-  $data = do_curl($url);
+
+  $ch = curl_init();
+  $user_agent = "Mozilla/4.0 pp(compatible; MSIE 5.01; Windows NT 5.0)";
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
+  curl_setopt($ch, CURLOPT_FAILONERROR, TRUE); // Fail on errors
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1); // allow redirects
+  curl_setopt($ch, CURLOPT_TIMEOUT, 90); // times out after 90s
+  curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE); // return into a variable
+  curl_setopt($ch, CURLOPT_URL, $url);
+  $data = curl_exec($ch);
+  if (!$data){
+    drupal_set_message("No results returned - please check url and login credentials", 'warning');
+    return;
+  }
+
   $dom = new DOMDocument();
   $dom->loadXML($data);
   $resumption_node = $dom->getElementsByTagName('resumptionToken')->item(0);
