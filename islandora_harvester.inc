@@ -8,13 +8,13 @@
  * @return array
  */
 function get_collections_as_array() {
-  module_load_include('inc', 'islandora_repository', 'api/fedora_utils');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $query = 'select $object $title from <#ri>
                             where ($object <dc:title> $title
                               and $object <info:fedora/fedora-system:def/model#hasModel> <info:fedora/islandora:collectionCModel>
                               and $object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>)
                             order by $title';
-  $url = variable_get('islandora_repository_url', 'http://localhost:8080/fedora/risearch');
+  $url = variable_get('fedora_repository_url', 'http://localhost:8080/fedora/risearch');
   $url .= "?type=tuples&flush=true&format=csv&limit=1000&lang=itql&stream=on&query=";
   $content = do_curl($url . htmlentities(urlencode($query)));
   $list = explode("\n", $content);
@@ -39,8 +39,8 @@ function get_collections_as_array() {
  * @return array
  */
 function oai_get_content_models_as_array() {
-  module_load_include('inc', 'islandora_repository', 'api/fedora_item');
-  module_load_include('inc', 'islandora_repository', 'api/fedora_utils');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_item');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $query = 'select $object $title from <#ri>
           where ($object <dc:title> $title
           and ($object <fedora-model:hasModel> <info:fedora/fedora-system:ContentModel-3.0>
@@ -48,7 +48,7 @@ function oai_get_content_models_as_array() {
           and $object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>)
           order by $title';
 
-  $url = variable_get('islandora_repository_url', 'http://localhost:8080/fedora/risearch');
+  $url = variable_get('fedora_repository_url', 'http://localhost:8080/fedora/risearch');
   $url .= "?type=tuples&flush=true&format=csv&limit=1000&lang=itql&stream=on&query=";
   $content = do_curl($url . htmlentities(urlencode($query)));
   $list = explode("\n", $content);
@@ -78,7 +78,7 @@ function oai_get_content_models_as_array() {
  */
 function oai_get_data($url) {
   set_time_limit(0);
-  module_load_include('inc', 'islandora_repository', 'api/fedora_utils');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $data = do_curl($url);
   $dom = new DOMDocument();
 
@@ -110,8 +110,8 @@ function oai_get_data($url) {
  */
 function build_oai_objects($record, $namespace, $collection_pid, $content_model) {
   set_time_limit(0);
-  module_load_include('inc', 'islandora_repository', 'api/fedora_utils');
-  module_load_include('inc', 'islandora_repository', 'api/fedora_item');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_item');
   $pid = fedora_item::get_next_PID_in_namespace($namespace);
   $dcStream = $record['dc'];
   $modsStream = oai_create_mods($dcStream);
@@ -136,8 +136,8 @@ function build_oai_objects($record, $namespace, $collection_pid, $content_model)
  */
 function build_csv_objects($headers, $data, $namespace, $collection_pid, $content_model) {
   set_time_limit(0);
-  module_load_include('inc', 'islandora_repository', 'api/fedora_item');
-  module_load_include('inc', 'islandora_repository', 'api/dublin_core');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_item');
+  module_load_include('inc', 'fedora_repository', 'api/dublin_core');
   $dc = new Dublin_Core();
   $limit = count($headers);
   for ($count = 0; $count < $limit; $count++) {
@@ -248,7 +248,7 @@ function process_input($url, $namespace, $collection_pid, $content_model) {
  */
 function get_tokens($url) {
   set_time_limit(0);
-  module_load_include('inc', 'islandora_repository', 'api/fedora_utils');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $urlParts = explode('?', $url);
   $base_url = $urlParts[0] . "?verb=ListRecords&resumptionToken=";
   $data = do_curl($url);
@@ -278,8 +278,8 @@ function get_tokens($url) {
  */
 function oai_create_mods($xmlstr) {
   $path = drupal_get_path('module', 'islandora_harvester');
-  module_load_include('inc', 'islandora_repository', 'ObjectHelper');
-  module_load_include('inc', 'islandora_repository', 'CollectionClass');
+  module_load_include('inc', 'fedora_repository', 'ObjectHelper');
+  module_load_include('inc', 'fedora_repository', 'CollectionClass');
 
   if ($xmlstr == NULL || strlen($xmlstr) < 5) {
     return " ";

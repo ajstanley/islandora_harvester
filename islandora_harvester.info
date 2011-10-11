@@ -2,6 +2,6 @@
 name = Islandora Harvester
 description = Module to allow retrieval of OAI or CSV inputs
 package = Islandora Tools
-dependencies[] = islandora_repository
+dependencies[] = fedora_repository
 version = 11.2.beta2
 core = 6.x

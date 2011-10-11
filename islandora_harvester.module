@@ -121,7 +121,7 @@ function oai_ingest_form(&$form_state) {
 
 //STOP HERE - KNOWN WORKING COPY
 function oai_ingest_form_submit($form, &$form_state) {
-  module_load_include('inc', 'islandora_repository', 'api/fedora_item');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_item');
   module_load_include('inc', 'islandora_harvester', 'islandora_harvester');
   $collection_pid = $form_state['values']['existing_collection'];
   $content_model = $form_state['values']['content_model'];
