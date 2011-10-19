@@ -278,8 +278,8 @@ function get_tokens($url) {
  */
 function oai_create_mods($xmlstr) {
   $path = drupal_get_path('module', 'islandora_harvester');
-  module_load_include('inc', 'fedora_repository', 'ObjectHelper');
-  module_load_include('inc', 'fedora_repository', 'CollectionClass');
+  module_load_include('inc', 'fedora_repository', 'api/ObjectHelper');
+  module_load_include('inc', 'fedora_repository', 'core/CollectionClass');
 
   if ($xmlstr == NULL || strlen($xmlstr) < 5) {
     return " ";
