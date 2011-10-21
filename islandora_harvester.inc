@@ -58,10 +58,9 @@ function oai_get_content_models_as_array() {
     if ($item) {
       $parts = explode(',', $item);
       $item = new fedora_item($parts[0]);
-      if ($item->get_datastream_dissemination('ISLANDORACM')){
+      if ($item->get_datastream_dissemination('ISLANDORACM')) {
         $options[$parts[0]] = $parts[1];
       }
-      
     }
   }
 
@@ -112,6 +111,8 @@ function build_oai_objects($record, $namespace, $collection_pid, $content_model)
   set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   module_load_include('inc', 'fedora_repository', 'api/fedora_item');
+  $thumbnail_file = drupal_get_path('module', 'islandora_harvester') . '/images/Crystal_Clear_action_filenew.png';
+
   $pid = fedora_item::get_next_PID_in_namespace($namespace);
   $dcStream = $record['dc'];
   $modsStream = oai_create_mods($dcStream);
@@ -122,6 +123,7 @@ function build_oai_objects($record, $namespace, $collection_pid, $content_model)
   $item->add_datastream_from_string($modsStream, 'MODS', "MODS", 'text/xml');
   $item->add_relationship('isMemberOfCollection', $collection_pid);
   $item->add_relationship('hasModel', $content_model, 'info:fedora/fedora-system:def/model#');
+  $item->add_datastream_from_file($thumbnail_file, 'TN');
 }
 
 /**
@@ -138,6 +140,7 @@ function build_csv_objects($headers, $data, $namespace, $collection_pid, $conten
   set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_item');
   module_load_include('inc', 'fedora_repository', 'api/dublin_core');
+  $thumbnail_file = drupal_get_path('module', 'islandora_harvester') . '/images/Crystal_Clear_action_filenew.png';
   $dc = new Dublin_Core();
   $limit = count($headers);
   for ($count = 0; $count < $limit; $count++) {
@@ -156,6 +159,7 @@ function build_csv_objects($headers, $data, $namespace, $collection_pid, $conten
   $item->modify_datastream_by_value($dc->as_xml(), 'DC', 'Dublin Core Metadata', 'text/xml', 'X');
   $modsStream = oai_create_mods($dc->as_xml());
   $item->add_datastream_from_string($modsStream, 'MODS', "MODS", 'text/xml');
+  $item->add_datastream_from_file($thumbnail_file, 'TN');
 }
 
 /**
@@ -251,7 +255,23 @@ function get_tokens($url) {
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $urlParts = explode('?', $url);
   $base_url = $urlParts[0] . "?verb=ListRecords&resumptionToken=";
-  $data = do_curl($url);
+
+  $ch = curl_init();
+  $user_agent = "Mozilla/4.0 pp(compatible; MSIE 5.01; Windows NT 5.0)";
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
+  curl_setopt($ch, CURLOPT_FAILONERROR, TRUE); // Fail on errors
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1); // allow redirects
+  curl_setopt($ch, CURLOPT_TIMEOUT, 90); // times out after 90s
+  curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE); // return into a variable
+  curl_setopt($ch, CURLOPT_URL, $url);
+  $data = curl_exec($ch);
+  if (!$data) {
+    drupal_set_message("No results returned - please check url and login credentials", 'warning');
+    return;
+  }
+
   $dom = new DOMDocument();
   $dom->loadXML($data);
   $resumption_node = $dom->getElementsByTagName('resumptionToken')->item(0);
