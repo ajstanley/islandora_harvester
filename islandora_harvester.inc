@@ -111,6 +111,8 @@ function build_oai_objects($record, $namespace, $collection_pid, $content_model)
   set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   module_load_include('inc', 'fedora_repository', 'api/fedora_item');
+  $thumbnail_file = drupal_get_path('module', 'islandora_harvester') . '/images/Crystal_Clear_action_filenew.png';
+
   $pid = fedora_item::get_next_PID_in_namespace($namespace);
   $dcStream = $record['dc'];
   $modsStream = oai_create_mods($dcStream);
@@ -121,6 +123,7 @@ function build_oai_objects($record, $namespace, $collection_pid, $content_model)
   $item->add_datastream_from_string($modsStream, 'MODS', "MODS", 'text/xml');
   $item->add_relationship('isMemberOfCollection', $collection_pid);
   $item->add_relationship('hasModel', $content_model, 'info:fedora/fedora-system:def/model#');
+  $item->add_datastream_from_file($thumbnail_file, 'TN');
 }
 
 /**
@@ -137,6 +140,7 @@ function build_csv_objects($headers, $data, $namespace, $collection_pid, $conten
   set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_item');
   module_load_include('inc', 'fedora_repository', 'api/dublin_core');
+  $thumbnail_file = drupal_get_path('module', 'islandora_harvester') . '/images/Crystal_Clear_action_filenew.png';
   $dc = new Dublin_Core();
   $limit = count($headers);
   for ($count = 0; $count < $limit; $count++) {
@@ -155,6 +159,7 @@ function build_csv_objects($headers, $data, $namespace, $collection_pid, $conten
   $item->modify_datastream_by_value($dc->as_xml(), 'DC', 'Dublin Core Metadata', 'text/xml', 'X');
   $modsStream = oai_create_mods($dc->as_xml());
   $item->add_datastream_from_string($modsStream, 'MODS', "MODS", 'text/xml');
+  $item->add_datastream_from_file($thumbnail_file, 'TN');
 }
 
 /**
@@ -262,7 +267,7 @@ function get_tokens($url) {
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE); // return into a variable
   curl_setopt($ch, CURLOPT_URL, $url);
   $data = curl_exec($ch);
-  if (!$data){
+  if (!$data) {
     drupal_set_message("No results returned - please check url and login credentials", 'warning');
     return;
   }

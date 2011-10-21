@@ -100,7 +100,7 @@ function oai_ingest_form(&$form_state) {
 
   $form['destination_data']['choiceLink'] = array(
     '#type' => 'markup',
-    '#value' => l(t('Add new collection here'), 'admin/content/modeler'),
+    '#value' => l(t('Add new collection here'), 'fedora/repository'),
   );
   $form['destination_data']['content_model'] = array(
     '#title' => "Choose content model",
