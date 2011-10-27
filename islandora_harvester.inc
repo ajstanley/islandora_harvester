@@ -196,8 +196,14 @@ function create_oai_batch($urls, $namespace, $collection_pid, $content_model) {
  * @param string $namespace
  * @param string $collection_pid
  */
-function create_csv_batch($file, $namespace, $collection_pid) {
+function create_csv_batch($file, $namespace, $collection_pid, $type) {
   set_time_limit(0);
+  if ($type == 'TSV'){
+    $delimiter = "\t";
+  }
+  else{
+    $delimiter = ",";
+  }
 
 
   $csv = $file->filepath;
@@ -206,9 +212,9 @@ function create_csv_batch($file, $namespace, $collection_pid) {
   $batch = array(
     'title' => t('Creating and ingesting Fedora objects)'),
     'operations' => array(),
-    'file' => drupal_get_path('module', 'oai_module') . '/islandora_harvester.inc',
+    'file' => drupal_get_path('module', 'islandora_harvester') . '/islandora_harvester.inc',
   );
-  while (($data = fgetcsv($handle, 5000, ",")) !== FALSE) {
+  while (($data = fgetcsv($handle, 5000, $delimiter)) !== FALSE) {
     if ($count == 1) {
       foreach ($data as $header) {
         $header = preg_replace('/\[.*\]/', '', $header);
@@ -224,6 +230,7 @@ function create_csv_batch($file, $namespace, $collection_pid) {
     $count++;
   }
   batch_set($batch);
+
   return;
 }
 
