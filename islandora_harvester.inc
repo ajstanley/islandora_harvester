@@ -78,7 +78,7 @@ function oai_get_content_models_as_array() {
 function oai_get_data($url) {
   set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
-  $data = do_curl($url);
+  $data = oai_curl($url);
   $dom = new DOMDocument();
 
   $dom->loadXML($data);
@@ -121,7 +121,7 @@ function build_oai_objects($record, $namespace, $collection_pid, $content_model)
   $item = fedora_item::ingest_new_item($pid, 'A', $title, 'Owner');
   $item->modify_datastream_by_value($dcStream, 'DC', "Dublin Core", 'text/xml');
   $item->add_datastream_from_string($modsStream, 'MODS', "MODS", 'text/xml');
-  $item->add_relationship('isMemberOfCollection', $collection_pid);
+  $item->add_relationship('isMemberOfCollection', $collection_pid, 'info:fedora/fedora-system:def/relations-external#');
   $item->add_relationship('hasModel', $content_model, 'info:fedora/fedora-system:def/model#');
   $item->add_datastream_from_file($thumbnail_file, 'TN');
 }
@@ -259,21 +259,9 @@ function process_input($url, $namespace, $collection_pid, $content_model) {
  */
 function get_tokens($url) {
   set_time_limit(0);
-  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $urlParts = explode('?', $url);
   $base_url = $urlParts[0] . "?verb=ListRecords&resumptionToken=";
-
-  $ch = curl_init();
-  $user_agent = "Mozilla/4.0 pp(compatible; MSIE 5.01; Windows NT 5.0)";
-  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
-  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
-  curl_setopt($ch, CURLOPT_FAILONERROR, TRUE); // Fail on errors
-  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1); // allow redirects
-  curl_setopt($ch, CURLOPT_TIMEOUT, 90); // times out after 90s
-  curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE); // return into a variable
-  curl_setopt($ch, CURLOPT_URL, $url);
-  $data = curl_exec($ch);
+  $data = oai_curl($url);
   if (!$data) {
     drupal_set_message("No results returned - please check url and login credentials", 'warning');
     return;
@@ -287,7 +275,7 @@ function get_tokens($url) {
   while ($token) {
     $new_url = $base_url . $token;
     $urls[] = $new_url;
-    $data = do_curl($new_url);
+    $data = oai_curl($new_url);
     $dom = new DOMDocument();
     $dom->loadXML($data);
     $resumption_node = $dom->getElementsByTagName('resumptionToken')->item(0);
@@ -330,3 +318,30 @@ function oai_create_mods($xmlstr) {
   return $content;
 }
 
+function oai_curl($url) {
+
+  if (function_exists("curl_init")) {
+    $ch = curl_init();
+    $user_agent = "Mozilla/4.0 pp(compatible; MSIE 5.01; Windows NT 5.0)";
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
+    curl_setopt($ch, CURLOPT_FAILONERROR, TRUE); // Fail on errors
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1); // allow redirects
+    curl_setopt($ch, CURLOPT_TIMEOUT, 90); // times out after 90s
+    curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE); // return into a variable
+    curl_setopt($ch, CURLOPT_URL, $url);
+
+    return curl_exec($ch);
+
+    $error_code = curl_errno($ch);
+    $error_string = curl_error($ch);
+    return array($ret_val, $error_code, $error_string);
+  }
+  else {
+    if (function_exists(drupal_set_message)) {
+      drupal_set_message(t('No curl support.'), 'error');
+    }
+    return NULL;
+  }
+}
