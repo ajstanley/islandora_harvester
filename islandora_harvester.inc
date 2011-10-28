@@ -9,6 +9,9 @@
  */
 function get_collections_as_array() {
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
+  $restricted = variable_get('fedora_namespace_restriction_enforced', TRUE);
+  $allowed_string = variable_get('fedora_pids_allowed', 'default: demo: changeme: islandora:');
+  $namespaces = explode(':', $allowed_string);
   $query = 'select $object $title from <#ri>
                             where ($object <dc:title> $title
                               and $object <info:fedora/fedora-system:def/model#hasModel> <info:fedora/islandora:collectionCModel>
@@ -19,12 +22,20 @@ function get_collections_as_array() {
   $content = do_curl($url . htmlentities(urlencode($query)));
   $list = explode("\n", $content);
   array_shift($list);
+  foreach($namespaces as $namespace){
+    $trimmed_names[] = trim($namespace);
+  }
   $list = preg_replace('/info:fedora\//', '', $list);
   $options = array();
   foreach ($list as $item) {   //removes  blanks
     if ($item) {
       $parts = explode(',', $item);
-      $options[$parts[0]] = $parts[1];
+      $namespace = explode(':', $parts[0]);
+      $namespace = trim($namespace[0]);
+      $bool = in_array($namespace, $trimmed_names);
+      if (!$restricted || in_array($namespace, $trimmed_names)) {
+        $options[$parts[0]] = $parts[1];
+      }
     }
   }
   unset($options['islandora:ContentModelCollection']);
@@ -198,10 +209,10 @@ function create_oai_batch($urls, $namespace, $collection_pid, $content_model) {
  */
 function create_csv_batch($file, $namespace, $collection_pid, $type) {
   set_time_limit(0);
-  if ($type == 'TSV'){
+  if ($type == 'TSV') {
     $delimiter = "\t";
   }
-  else{
+  else {
     $delimiter = ",";
   }
 
