@@ -145,7 +145,7 @@ function oai_ingest_form_submit($form, &$form_state) {
 
   if ($_FILES['files']['name']['file_upload']) {
     $csv_file = file_save_upload('file_upload');
-    create_csv_batch($csv_file, $namespace, $collection_pid, $form_state['values']['input_type']);
+    create_csv_batch($csv_file, $namespace, $collection_pid, $form_state['values']['input_type'],  $form_state['values']['content_model']);
     return;
   }
 }

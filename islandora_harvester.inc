@@ -207,7 +207,7 @@ function create_oai_batch($urls, $namespace, $collection_pid, $content_model) {
  * @param string $namespace
  * @param string $collection_pid
  */
-function create_csv_batch($file, $namespace, $collection_pid, $type) {
+function create_csv_batch($file, $namespace, $collection_pid, $type, $content_model) {
   set_time_limit(0);
   if ($type == 'TSV') {
     $delimiter = "\t";
@@ -236,7 +236,7 @@ function create_csv_batch($file, $namespace, $collection_pid, $type) {
       }
     }
     else {
-      $batch['operations'][] = array('build_csv_objects', array($headers, $data, $namespace, $collection_pid));
+      $batch['operations'][] = array('build_csv_objects', array($headers, $data, $namespace, $collection_pid, $content_model));
     }
     $count++;
   }
