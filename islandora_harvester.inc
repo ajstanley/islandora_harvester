@@ -165,7 +165,7 @@ function build_csv_objects($headers, $data, $namespace, $collection_pid, $conten
   }
   $pid = fedora_item::get_next_PID_in_namespace($namespace);
   $item = fedora_item::ingest_new_item($pid, 'A', $title, 'Owner');
-  $item->add_relationship('isMemberOf', $collection_pid);
+  $item->add_relationship('isMemberOf', $collection_pid, 'info:fedora/fedora-system:def/relations-external#');
   $item->add_relationship('hasModel', $content_model, 'info:fedora/fedora-system:def/model#');
   $item->modify_datastream_by_value($dc->as_xml(), 'DC', 'Dublin Core Metadata', 'text/xml', 'X');
   $modsStream = oai_create_mods($dc->as_xml());
