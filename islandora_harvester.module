@@ -98,10 +98,6 @@ function oai_ingest_form(&$form_state) {
     '#description' => t("Add objects to which collection?"),
   );
 
-  $form['destination_data']['choiceLink'] = array(
-    '#type' => 'markup',
-    '#value' => l(t('Add new collection here'), 'fedora/repository'),
-  );
   $form['destination_data']['content_model'] = array(
     '#title' => "Choose content model",
     '#type' => 'select',
