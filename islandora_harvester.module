@@ -42,8 +42,15 @@ function oai_ingest_form(&$form_state) {
   drupal_add_js("$path/js/fix-jquery-update.js", 'theme');
   $collections = get_collections_as_array();
   $content_models = oai_get_content_models_as_array();
+  $collection_pid = $form_state['values']['existing_collection'];
+  $first = key($collections);
+  $allowed_content_models = get_allowed_content_models($first);
+  if ($collection_pid) {
+    $allowed_content_models = get_allowed_content_models($collection_pid);
+  }
 
   $input_type = $form_state['values']['input_type'];
+  $chosen_model = $form_state['values']['existing_collection'];
   $form['#attributes']['enctype'] = 'multipart/form-data';
   $form['source_data'] = array(
     '#prefix' => '<div id="source-info">',
@@ -83,6 +90,9 @@ function oai_ingest_form(&$form_state) {
 
   $create = $form_state['values']['create'];
 
+  $form['namespace'] = array(
+  );
+
   $form['destination_data'] = array(
     '#prefix' => '<div id="destination-info">',
     '#suffix' => '</div>',
@@ -95,15 +105,27 @@ function oai_ingest_form(&$form_state) {
     '#title' => "Add to collection",
     '#type' => 'select',
     '#options' => $collections,
+    '#default_value' => $chosen_model,
     '#description' => t("Add objects to which collection?"),
+    '#ahah' => array(
+      'path' => 'oai/source/update/destination_data',
+      'wrapper' => 'destination-info',
+      'effect' => 'fade',
+      'event' => 'change'),
   );
 
-  $form['destination_data']['content_model'] = array(
-    '#title' => "Choose content model",
-    '#type' => 'select',
-    '#options' => $content_models,
-    '#description' => t("Content models describe the behaviours of objects with which they are associated."),
-  );
+
+  if ($allowed_content_models) {
+    $form['destination_data']['content_model'] = array(
+      '#title' => "Choose content model",
+      '#type' => 'select',
+      '#options' => $allowed_content_models,
+      '#description' => t("Content models describe the behaviours of objects with which they are associated."),
+    );
+  }else{
+    drupal_set_message(t('This collection has no content models in its Collection Policy'));
+  }
+
 
 
   $form['submit'] = array(
@@ -123,7 +145,16 @@ function oai_ingest_form_submit($form, &$form_state) {
   $collection_item = new fedora_item($collection_pid);
   $collection_policy = $collection_item->get_datastream_dissemination('COLLECTION_POLICY');
   $xml = simplexml_load_string($collection_policy);
-  $namespace = $xml->content_models->content_model['namespace'];
+
+  $json = json_encode($xml);
+  $results = json_decode($json, true);
+
+  $namespace = $collection_pid;
+  foreach ($results['content_models']['content_model'] as $cm) {
+    if ($cm['@attributes']['pid'] == $content_model) {
+      $namespace = $cm['@attributes']['namespace'];
+    }
+  }
   $namespace = substr($namespace, 0, strpos($namespace, ":"));
 
   if (!empty($form_state['ahah_submission'])) {
@@ -141,7 +172,7 @@ function oai_ingest_form_submit($form, &$form_state) {
 
   if ($_FILES['files']['name']['file_upload']) {
     $csv_file = file_save_upload('file_upload');
-    create_csv_batch($csv_file, $namespace, $collection_pid, $form_state['values']['input_type'],  $form_state['values']['content_model']);
+    create_csv_batch($csv_file, $namespace, $collection_pid, $form_state['values']['input_type'], $form_state['values']['content_model']);
     return;
   }
 }
@@ -151,6 +182,17 @@ function oai_ingest_from_file($file) {
 }
 
 function update_source_div($data_source) {
+  $form = oai_callback_prep();
+  $changed_elements = $form[$data_source];
+  unset($changed_elements['#prefix'], $changed_elements['#suffix']);
+  $output = theme('status_messages') . drupal_render($changed_elements);
+  drupal_json(array(
+    'status' => TRUE,
+    'data' => $output,
+  ));
+}
+
+function update_destination_div($data_source) {
   $form = oai_callback_prep();
   $changed_elements = $form[$data_source];
   unset($changed_elements['#prefix'], $changed_elements['#suffix']);

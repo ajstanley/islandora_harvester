@@ -22,7 +22,7 @@ function get_collections_as_array() {
   $content = do_curl($url . htmlentities(urlencode($query)));
   $list = explode("\n", $content);
   array_shift($list);
-  foreach($namespaces as $namespace){
+  foreach ($namespaces as $namespace) {
     $trimmed_names[] = trim($namespace);
   }
   $list = preg_replace('/info:fedora\//', '', $list);
@@ -355,4 +355,29 @@ function oai_curl($url) {
     }
     return NULL;
   }
+}
+
+function get_allowed_content_models($collection_pid) {
+  module_load_include('inc', 'fedora_repository', 'api/fedora_item');
+
+  $collection_item = new fedora_item($collection_pid);
+  $collection_policy = $collection_item->get_datastream_dissemination('COLLECTION_POLICY');
+  $xml = simplexml_load_string($collection_policy);
+  $json = json_encode($xml);
+  $results = json_decode($json, true);
+  $results_array = array();
+  foreach ($results['content_models']['content_model'] as $cm) {
+    $key = $cm['@attributes']['pid'];
+    if(!$key){
+      $key = $cm['pid'];
+    }
+
+    $value = $cm['@attributes']['name'];
+        if (!$value){
+      $value = $cm['name'];
+    }
+    $results_array[$key] = $value;
+  }
+  unset($results_array['islandora:collectionCModel']);
+  return $results_array;
 }
