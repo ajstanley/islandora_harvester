@@ -9,6 +9,9 @@
  */
 function get_collections_as_array() {
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
+  $restricted = variable_get('fedora_namespace_restriction_enforced', TRUE);
+  $allowed_string = variable_get('fedora_pids_allowed', 'default: demo: changeme: islandora:');
+  $namespaces = explode(':', $allowed_string);
   $query = 'select $object $title from <#ri>
                             where ($object <dc:title> $title
                               and $object <info:fedora/fedora-system:def/model#hasModel> <info:fedora/islandora:collectionCModel>
@@ -19,12 +22,20 @@ function get_collections_as_array() {
   $content = do_curl($url . htmlentities(urlencode($query)));
   $list = explode("\n", $content);
   array_shift($list);
+  foreach ($namespaces as $namespace) {
+    $trimmed_names[] = trim($namespace);
+  }
   $list = preg_replace('/info:fedora\//', '', $list);
   $options = array();
   foreach ($list as $item) {   //removes  blanks
     if ($item) {
       $parts = explode(',', $item);
-      $options[$parts[0]] = $parts[1];
+      $namespace = explode(':', $parts[0]);
+      $namespace = trim($namespace[0]);
+      $bool = in_array($namespace, $trimmed_names);
+      if (!$restricted || in_array($namespace, $trimmed_names)) {
+        $options[$parts[0]] = $parts[1];
+      }
     }
   }
   unset($options['islandora:ContentModelCollection']);
@@ -78,7 +89,7 @@ function oai_get_content_models_as_array() {
 function oai_get_data($url) {
   set_time_limit(0);
   module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
-  $data = do_curl($url);
+  $data = oai_curl($url);
   $dom = new DOMDocument();
 
   $dom->loadXML($data);
@@ -121,7 +132,7 @@ function build_oai_objects($record, $namespace, $collection_pid, $content_model)
   $item = fedora_item::ingest_new_item($pid, 'A', $title, 'Owner');
   $item->modify_datastream_by_value($dcStream, 'DC', "Dublin Core", 'text/xml');
   $item->add_datastream_from_string($modsStream, 'MODS', "MODS", 'text/xml');
-  $item->add_relationship('isMemberOfCollection', $collection_pid);
+  $item->add_relationship('isMemberOfCollection', $collection_pid, 'info:fedora/fedora-system:def/relations-external#');
   $item->add_relationship('hasModel', $content_model, 'info:fedora/fedora-system:def/model#');
   $item->add_datastream_from_file($thumbnail_file, 'TN');
 }
@@ -154,7 +165,7 @@ function build_csv_objects($headers, $data, $namespace, $collection_pid, $conten
   }
   $pid = fedora_item::get_next_PID_in_namespace($namespace);
   $item = fedora_item::ingest_new_item($pid, 'A', $title, 'Owner');
-  $item->add_relationship('isMemberOf', $collection_pid);
+  $item->add_relationship('isMemberOfCollection', $collection_pid, 'info:fedora/fedora-system:def/relations-external#');
   $item->add_relationship('hasModel', $content_model, 'info:fedora/fedora-system:def/model#');
   $item->modify_datastream_by_value($dc->as_xml(), 'DC', 'Dublin Core Metadata', 'text/xml', 'X');
   $modsStream = oai_create_mods($dc->as_xml());
@@ -196,8 +207,14 @@ function create_oai_batch($urls, $namespace, $collection_pid, $content_model) {
  * @param string $namespace
  * @param string $collection_pid
  */
-function create_csv_batch($file, $namespace, $collection_pid) {
+function create_csv_batch($file, $namespace, $collection_pid, $type, $content_model) {
   set_time_limit(0);
+  if ($type == 'TSV') {
+    $delimiter = "\t";
+  }
+  else {
+    $delimiter = ",";
+  }
 
 
   $csv = $file->filepath;
@@ -206,9 +223,9 @@ function create_csv_batch($file, $namespace, $collection_pid) {
   $batch = array(
     'title' => t('Creating and ingesting Fedora objects)'),
     'operations' => array(),
-    'file' => drupal_get_path('module', 'oai_module') . '/islandora_harvester.inc',
+    'file' => drupal_get_path('module', 'islandora_harvester') . '/islandora_harvester.inc',
   );
-  while (($data = fgetcsv($handle, 5000, ",")) !== FALSE) {
+  while (($data = fgetcsv($handle, 5000, $delimiter)) !== FALSE) {
     if ($count == 1) {
       foreach ($data as $header) {
         $header = preg_replace('/\[.*\]/', '', $header);
@@ -219,11 +236,12 @@ function create_csv_batch($file, $namespace, $collection_pid) {
       }
     }
     else {
-      $batch['operations'][] = array('build_csv_objects', array($headers, $data, $namespace, $collection_pid));
+      $batch['operations'][] = array('build_csv_objects', array($headers, $data, $namespace, $collection_pid, $content_model));
     }
     $count++;
   }
   batch_set($batch);
+
   return;
 }
 
@@ -252,21 +270,9 @@ function process_input($url, $namespace, $collection_pid, $content_model) {
  */
 function get_tokens($url) {
   set_time_limit(0);
-  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
   $urlParts = explode('?', $url);
   $base_url = $urlParts[0] . "?verb=ListRecords&resumptionToken=";
-
-  $ch = curl_init();
-  $user_agent = "Mozilla/4.0 pp(compatible; MSIE 5.01; Windows NT 5.0)";
-  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
-  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
-  curl_setopt($ch, CURLOPT_FAILONERROR, TRUE); // Fail on errors
-  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1); // allow redirects
-  curl_setopt($ch, CURLOPT_TIMEOUT, 90); // times out after 90s
-  curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE); // return into a variable
-  curl_setopt($ch, CURLOPT_URL, $url);
-  $data = curl_exec($ch);
+  $data = oai_curl($url);
   if (!$data) {
     drupal_set_message("No results returned - please check url and login credentials", 'warning');
     return;
@@ -280,7 +286,7 @@ function get_tokens($url) {
   while ($token) {
     $new_url = $base_url . $token;
     $urls[] = $new_url;
-    $data = do_curl($new_url);
+    $data = oai_curl($new_url);
     $dom = new DOMDocument();
     $dom->loadXML($data);
     $resumption_node = $dom->getElementsByTagName('resumptionToken')->item(0);
@@ -323,3 +329,55 @@ function oai_create_mods($xmlstr) {
   return $content;
 }
 
+function oai_curl($url) {
+
+  if (function_exists("curl_init")) {
+    $ch = curl_init();
+    $user_agent = "Mozilla/4.0 pp(compatible; MSIE 5.01; Windows NT 5.0)";
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
+    curl_setopt($ch, CURLOPT_FAILONERROR, TRUE); // Fail on errors
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1); // allow redirects
+    curl_setopt($ch, CURLOPT_TIMEOUT, 90); // times out after 90s
+    curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE); // return into a variable
+    curl_setopt($ch, CURLOPT_URL, $url);
+
+    return curl_exec($ch);
+
+    $error_code = curl_errno($ch);
+    $error_string = curl_error($ch);
+    return array($ret_val, $error_code, $error_string);
+  }
+  else {
+    if (function_exists(drupal_set_message)) {
+      drupal_set_message(t('No curl support.'), 'error');
+    }
+    return NULL;
+  }
+}
+
+function get_allowed_content_models($collection_pid) {
+  module_load_include('inc', 'fedora_repository', 'api/fedora_item');
+
+  $collection_item = new fedora_item($collection_pid);
+  $collection_policy = $collection_item->get_datastream_dissemination('COLLECTION_POLICY');
+  $xml = simplexml_load_string($collection_policy);
+  $json = json_encode($xml);
+  $results = json_decode($json, true);
+  $results_array = array();
+  foreach ($results['content_models']['content_model'] as $cm) {
+    $key = $cm['@attributes']['pid'];
+    if(!$key){
+      $key = $cm['pid'];
+    }
+
+    $value = $cm['@attributes']['name'];
+        if (!$value){
+      $value = $cm['name'];
+    }
+    $results_array[$key] = $value;
+  }
+  unset($results_array['islandora:collectionCModel']);
+  return $results_array;
+}
