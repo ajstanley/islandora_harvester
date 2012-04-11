@@ -18,7 +18,7 @@ function get_collections_as_array() {
                               and $object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>)
                             order by $title';
   $url = variable_get('fedora_repository_url', 'http://localhost:8080/fedora/risearch');
-  $url .= "?type=tuples&flush=true&format=csv&limit=1000&lang=itql&stream=on&query=";
+  $url .= "?type=tuples&flush=TRUE&format=csv&limit=1000&lang=itql&stream=on&query=";
   $content = do_curl($url . htmlentities(urlencode($query)));
   $list = explode("\n", $content);
   array_shift($list);
@@ -60,7 +60,7 @@ function oai_get_content_models_as_array() {
           order by $title';
 
   $url = variable_get('fedora_repository_url', 'http://localhost:8080/fedora/risearch');
-  $url .= "?type=tuples&flush=true&format=csv&limit=1000&lang=itql&stream=on&query=";
+  $url .= "?type=tuples&flush=TRUE&format=csv&limit=1000&lang=itql&stream=on&query=";
   $content = do_curl($url . htmlentities(urlencode($query)));
   $list = explode("\n", $content);
   array_shift($list);
@@ -304,8 +304,8 @@ function get_tokens($url) {
  */
 function oai_create_mods($xmlstr) {
   $path = drupal_get_path('module', 'islandora_harvester');
-  module_load_include('inc', 'fedora_repository', 'ObjectHelper');
-  module_load_include('inc', 'fedora_repository', 'CollectionClass');
+  module_load_include('inc', 'fedora_repository', 'api/ObjectHelper');
+  module_load_include('inc', 'fedora_repository', 'core/CollectionClass');
 
   if ($xmlstr == NULL || strlen($xmlstr) < 5) {
     return " ";
@@ -314,7 +314,7 @@ function oai_create_mods($xmlstr) {
   try {
     $proc = new XsltProcessor();
   } catch (Exception $e) {
-    drupal_set_message(t("!e", array('!e' => $e->getMessage())), 'error');
+    drupal_set_message(t('@e', array('@e' => check_plain($e->getMessage()))), 'error');
     return " ";
   }
 

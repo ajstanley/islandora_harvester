@@ -1,7 +1,6 @@
-; $Id$
 name = Islandora Harvester
 description = Module to allow retrieval of OAI or CSV inputs
-package = Islandora
+package = Islandora Tools
 dependencies[] = fedora_repository
-version = 6.1
+version = 11.3.1
 core = 6.x
