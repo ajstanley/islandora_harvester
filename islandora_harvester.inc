@@ -365,19 +365,20 @@ function get_allowed_content_models($collection_pid) {
   $xml = simplexml_load_string($collection_policy);
   $json = json_encode($xml);
   $results = json_decode($json, true);
-  $results_array = array();
-  foreach ($results['content_models']['content_model'] as $cm) {
-    $key = $cm['@attributes']['pid'];
-    if(!$key){
-      $key = $cm['pid'];
+  if ($results) {
+    $results_array = array();
+    foreach ($results['content_models']['content_model'] as $cm) {
+      $key = $cm['@attributes']['pid'];
+      if (!$key) {
+        $key = $cm['pid'];
+      }
+      $value = $cm['@attributes']['name'];
+      if (!$value) {
+        $value = $cm['name'];
+      }
+      $results_array[$key] = $value;
     }
-
-    $value = $cm['@attributes']['name'];
-        if (!$value){
-      $value = $cm['name'];
-    }
-    $results_array[$key] = $value;
+    unset($results_array['islandora:collectionCModel']);
   }
-  unset($results_array['islandora:collectionCModel']);
   return $results_array;
 }
