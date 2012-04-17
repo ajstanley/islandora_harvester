@@ -225,7 +225,7 @@ function create_csv_batch($file, $namespace, $collection_pid, $type, $content_mo
   $handle = fopen($csv, "r");
   $count = 1;
   $batch = array(
-    'title' => t('Creating and ingesting Fedora objects)'),
+    'title' => t('Creating and ingesting Fedora objects'),
     'operations' => array(),
     'file' => drupal_get_path('module', 'islandora_harvester') . '/islandora_harvester.inc',
   );
