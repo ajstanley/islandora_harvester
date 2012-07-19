@@ -78,36 +78,6 @@ function oai_get_content_models_as_array() {
   return $options;
 }
 
-/**
- * Function oai_get_data
- *
- * Description: retrieves record data from supplied URL
- *
- * @param URL $url
- * @return array
- */
-function oai_get_data($url) {
-  set_time_limit(0);
-  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
-  $data = oai_curl($url);
-  $dom = new DOMDocument();
-
-  $dom->loadXML($data);
-  $allData = array();
-  $records = $dom->getElementsByTagName("record");
-
-  foreach ($records as $record) {
-    $recordData = array();
-    $metadata = $record->getElementsByTagName('metadata')->item(0);
-    $oai_dc = $metadata->getElementsByTagNameNS('http://www.openarchives.org/OAI/2.0/oai_dc/', '*');
-    $oai_dc = $oai_dc->item(0);
-    $recordData['dc'] = $dom->saveXML($oai_dc);
-    $header = $record->getElementsByTagName('header')->item(0);
-    $recordData['header'] = $dom->saveXML($header);
-    $allData[] = $recordData;
-  }
-  return $allData;
-}
 
 /**
  * Function: build_oai_objects
@@ -186,19 +156,19 @@ function build_csv_objects($headers, $data, $namespace, $collection_pid, $conten
  * @param string $collection_pid
  * @param array $urls
  */
-function create_oai_batch($urls, $namespace, $collection_pid, $content_model) {
+function create_oai_batch($fullDom, $namespace, $collection_pid, $content_model) {
 
   $batch = array(
-    'title' => "Creating batches of objects in Fedora repository",
-    'progress_message' => t('Processed @current batches out of @total.'),
+    'title' => "Creating objects in Fedora repository",
+    'progress_message' => t('Processed @current objects out of @total.'),
     'operations' => array(),
     'file' => drupal_get_path('module', 'islandora_harvester') . '/islandora_harvester.inc',
   );
-
-  foreach ($urls as $url) {
-    $batch['operations'][] = array('process_input', array($url, $namespace, $collection_pid, $content_model));
+  $records_to_add = oai_get_input_data($fullDom);
+  $count = count($records_to_add);
+  foreach ($records_to_add as $record) {
+    $batch['operations'][] = array('build_oai_objects', array($record, $namespace, $collection_pid, $content_model));
   }
-
   batch_set($batch);
 }
 
@@ -249,34 +219,20 @@ function create_csv_batch($file, $namespace, $collection_pid, $type, $content_mo
   return;
 }
 
-/**
- * Function process_input
- *
- * Description: Loops through urls to create batches of Fedora objects
- * @param URL $url
- * @param string $namespace
- * @param string $collection_pid
- */
-function process_input($url, $namespace, $collection_pid, $content_model) {
-  set_time_limit(0);
-  $records = oai_get_data($url);
-  foreach ($records as $record) {
-    build_oai_objects($record, $namespace, $collection_pid, $content_model);
-  }
-}
+
 
 /**
- * Function get tokens
+ * Function build_full_dom
  *
- * Description: returns list of redemption tokens from original url
+ * Description: returns dom object with all objects to be imported
  * @param URL $url
- * @return string
+ * @return DomDocument
  */
-function get_tokens($url) {
+function build_full_dom($url) {
   set_time_limit(0);
   $urlParts = explode('?', $url);
   $base_url = $urlParts[0] . "?verb=ListRecords&resumptionToken=";
-  $data = oai_curl($url);
+  $data = file_get_contents($url);
   if (!$data) {
     drupal_set_message("No results returned - please check url and login credentials", 'warning');
     return;
@@ -284,19 +240,24 @@ function get_tokens($url) {
 
   $dom = new DOMDocument();
   $dom->loadXML($data);
+  $domBase = $dom->getElementsByTagName('ListRecords')->item(0);
   $resumption_node = $dom->getElementsByTagName('resumptionToken')->item(0);
-  $urls = array($url);
   $token = $resumption_node->nodeValue;
   while ($token) {
     $new_url = $base_url . $token;
-    $urls[] = $new_url;
-    $data = oai_curl($new_url);
-    $dom = new DOMDocument();
-    $dom->loadXML($data);
-    $resumption_node = $dom->getElementsByTagName('resumptionToken')->item(0);
+    $data = file_get_contents($new_url);
+    $sub_dom = new DOMDocument();
+    $sub_dom->loadXML($data);
+    $records = $sub_dom->getElementsByTagName("record");
+    foreach ($records as $record) {
+      $newNode = $dom->importNode($record, TRUE);
+      $domBase->appendChild($newNode);
+    }
+    $resumption_node = $sub_dom->getElementsByTagName('resumptionToken')->item(0);
     $token = $resumption_node->nodeValue;
   }
-  return $urls;
+  $records = $dom->getElementsByTagName("record");
+  return $dom;
 }
 
 /**
@@ -333,33 +294,7 @@ function oai_create_mods($xmlstr) {
   return $content;
 }
 
-function oai_curl($url) {
 
-  if (function_exists("curl_init")) {
-    $ch = curl_init();
-    $user_agent = "Mozilla/4.0 pp(compatible; MSIE 5.01; Windows NT 5.0)";
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
-    curl_setopt($ch, CURLOPT_FAILONERROR, TRUE); // Fail on errors
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1); // allow redirects
-    curl_setopt($ch, CURLOPT_TIMEOUT, 90); // times out after 90s
-    curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE); // return into a variable
-    curl_setopt($ch, CURLOPT_URL, $url);
-
-    return curl_exec($ch);
-
-    $error_code = curl_errno($ch);
-    $error_string = curl_error($ch);
-    return array($ret_val, $error_code, $error_string);
-  }
-  else {
-    if (function_exists(drupal_set_message)) {
-      drupal_set_message(t('No curl support.'), 'error');
-    }
-    return NULL;
-  }
-}
 
 function get_allowed_content_models($collection_pid) {
   module_load_include('inc', 'fedora_repository', 'api/fedora_item');
@@ -385,4 +320,24 @@ function get_allowed_content_models($collection_pid) {
     unset($results_array['islandora:collectionCModel']);
   }
   return $results_array;
+}
+
+
+function oai_get_input_data($dom){
+  set_time_limit(0);
+  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
+  $allData = array();
+  $records = $dom->getElementsByTagName("record");
+
+  foreach ($records as $record) {
+    $recordData = array();
+    $metadata = $record->getElementsByTagName('metadata')->item(0);
+    $oai_dc = $metadata->getElementsByTagNameNS('http://www.openarchives.org/OAI/2.0/oai_dc/', '*');
+    $oai_dc = $oai_dc->item(0);
+    $recordData['dc'] = $dom->saveXML($oai_dc);
+    $header = $record->getElementsByTagName('header')->item(0);
+    $recordData['header'] = $dom->saveXML($header);
+    $allData[] = $recordData;
+  }
+  return $allData;
 }
