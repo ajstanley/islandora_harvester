@@ -33,14 +33,15 @@ function islandora_harvester_menu() {
     'title' => t('Harvest into Collection'),
     'page callback' => 'get_collection_harvest_form',
     'type' => MENU_CALLBACK,
-    'access arguments' => array('manage collections'),
+    'access arguments' => array('harvest into collection'),
   );
   return $items;
 }
 
 function islandora_harvester_perm() {
   return array(
-    'harvest OAI'
+    'harvest OAI',
+    'harvest into collection'
   );
 }
 
